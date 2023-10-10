@@ -1,0 +1,213 @@
+---
+title: "Case Study"
+author: "Andy Turner"
+date: "2023-10-10"
+output: html_document
+---
+
+## Getting in Data 
+
+```{r}
+library(p8105.datasets)
+library(tidyverse)
+library(ggridges)
+
+data(nyc_airbnb)
+
+nyc_airbnb= 
+  nyc_airbnb |> 
+  rename(borough= neighbourhood_group) |> 
+  mutate(stars= review_scores_location / 2)
+
+```
+
+## Brainstorm Questions
+- Where are AirBnBs expensive?
+  - borough? neighborhood?
+  - do other factors (room type) affect price? what about rating?
+- How long are AirBnbs active?
+  - Are AirBnbs illegal and do they get shut down?
+- Which units have the most availability?
+- How is review score impacted by location?
+- How many apts are run by one host?
+  - Does that affect price?
+  - Does that vary by neighborhood?
+- Where are AirBnBs?
+  - Borough? Neighborhood?
+  - Lat and long?
+  
+## Attempted Solutions
+```{r}
+nyc_airbnb |> 
+  group_by(borough) |> 
+  summarize(n_obs= n())
+```
+1 Bronx           649
+2 Brooklyn      16810
+3 Manhattan     19212
+4 Queens         3821
+5 Staten Island   261
+
+```{r}
+nyc_airbnb |> 
+  group_by(neighbourhood) |> 
+  summarize(n_obs= n())
+```
+
+```{r}
+upper_prices_nyc =
+  nyc_airbnb |> 
+  mutate(price_rank= min_rank(desc(price))) |> 
+  filter(price_rank < 10)
+
+lower_prices_nyc =
+  nyc_airbnb |> 
+  mutate(price_rank= min_rank(price)) |> 
+  filter(price_rank < 10)
+
+upper_prices_nyc |> 
+  group_by(borough) |> 
+  summarize(n_obs= n())
+
+lower_prices_nyc |> 
+  group_by(borough) |> 
+  summarize(n_obs=n())
+```
+
+## In Class Solutions
+```{r}
+nyc_airbnb |> 
+  count(borough)
+
+nyc_airbnb |> 
+  group_by(borough) |> 
+  summarize(mean_price= mean(price))
+
+nyc_airbnb |> 
+  group_by(borough, room_type) |> 
+  summarize(mean_price= mean(price)) |> 
+  pivot_wider(
+    names_from = room_type,
+    values_from= mean_price
+  )
+
+nyc_airbnb |> 
+  group_by(borough, room_type) |> 
+  summarize(median_price= median(price)) |> 
+  pivot_wider(
+    names_from = room_type,
+    values_from= median_price
+  )
+```
+
+```{r}
+nyc_airbnb |> 
+  ggplot(aes(x=price))+
+  geom_histogram()+
+  facet_grid(borough ~ room_type)
+```
+
+```{r}
+nyc_airbnb |> 
+  filter(price >= 9500)
+```
+
+```{r}
+nyc_airbnb |> 
+  filter(price <1000, room_type == "Entire home/apt") |> 
+  ggplot(aes(x=price))+
+  geom_histogram()+
+  facet_grid(. ~ borough)
+```
+
+```{r}
+nyc_airbnb |> 
+  filter(price<1000, 
+         room_type == "Entire home/apt",
+         borough == "Manhattan") |> 
+  group_by(neighbourhood) |> 
+  summarize(
+    n_apt = n(),
+    mean_price= mean(price)) |> 
+  arrange(desc(mean_price))
+
+nyc_airbnb |> 
+  filter(price<1000, 
+         room_type == "Entire home/apt",
+         borough == "Manhattan") |> 
+  group_by(neighbourhood) |> 
+  summarize(
+    n_apt = n(),
+    mean_price= mean(price)) |> 
+  arrange(mean_price)
+```
+
+Arrange: helps you to sort the data you need
+Summarize: helps display everything as well 
+Group_by: Get things grouped to be easier to do data on
+
+```{r}
+nyc_airbnb |> 
+  filter(
+    price <1000,
+    room_type == "Entire home/apt",
+    borough == "Manhattan") |> 
+  ggplot(aes(x=neighbourhood, y=price))+
+  geom_boxplot(
+  )
+
+nyc_airbnb |> 
+  filter(
+    price <1000,
+    room_type == "Entire home/apt",
+    borough == "Manhattan") |> 
+  mutate(neighbourhood = fct_reorder(neighbourhood, price)) |> 
+  ggplot(aes(x=neighbourhood, y=price))+
+  geom_boxplot(
+  )
+
+nyc_airbnb |> 
+  filter(
+    price <1000,
+    room_type == "Entire home/apt",
+    borough == "Manhattan") |> 
+  mutate(neighbourhood = fct_reorder(neighbourhood, price)) |> 
+  ggplot(aes(x=price, y=neighbourhood))+
+  geom_density_ridges()
+```
+
+## Try to make a map
+```{r}
+nyc_airbnb |> 
+  filter(
+    price <1000,
+    room_type == "Entire home/apt",
+    borough == "Manhattan") |> 
+  ggplot(aes(x=lat, y=long, color=price))+
+  geom_point()
+```
+
+Try something else entirely --> teach data science website for leaflet
+```{r}
+library(leaflet)
+nyc_airbnb |> 
+  filter(
+    price <1000,
+    room_type == "Entire home/apt",
+    borough == "Manhattan") |> 
+  sample_n(500) |> 
+  leaflet() |> 
+  addTiles() |> 
+  addMarkers(~lat, ~long)
+
+library(leaflet)
+nyc_airbnb |> 
+  filter(
+    price <1000,
+    room_type == "Entire home/apt",
+    borough == "Manhattan") |> 
+  sample_n(1000) |> 
+  leaflet() |> 
+  addProviderTiles(providers$CartoDB.Positron) |> 
+  addCircleMarkers(~lat, ~long, radius=0.5)
+```
